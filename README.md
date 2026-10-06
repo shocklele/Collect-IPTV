@@ -52,12 +52,13 @@
 | 顺序 | 上游 | 地址 |
 |---|---|---|
 | 1 | [vbskycn/iptv](https://github.com/vbskycn/iptv) | `https://gh-proxy.com/raw.githubusercontent.com/vbskycn/iptv/refs/heads/master/tv/iptv4.m3u` |
-| 2 | [suxuang/myIPTV](https://github.com/suxuang/myIPTV) | `https://raw.githubusercontent.com/suxuang/myIPTV/refs/heads/main/ipv4.m3u` |
-| 3 | [iptv-org/iptv](https://github.com/iptv-org/iptv)（中文频道） | `https://iptv-org.github.io/iptv/languages/zho.m3u` |
-| 4 | [Kimentanm/aptv](https://github.com/Kimentanm/aptv) | `https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u` |
-| 5 | [zwc456baby/iptv_alive](https://github.com/zwc456baby/iptv_alive) | `https://raw.githubusercontent.com/zwc456baby/iptv_alive/refs/heads/master/live.m3u` |
-| 6 | [hujingguang/ChinaIPTV](https://github.com/hujingguang/ChinaIPTV) | `https://raw.githubusercontent.com/hujingguang/ChinaIPTV/main/cnTV_AutoUpdate.m3u8` |
-| 7 | tv.iill.top | `https://tv.iill.top/m3u/Gather` |
+| 2 | [Guovin/iptv-api](https://github.com/Guovin/iptv-api) | `https://raw.githubusercontent.com/Guovin/iptv-api/gd/output/ipv4/result.m3u` |
+| 3 | [suxuang/myIPTV](https://github.com/suxuang/myIPTV) | `https://raw.githubusercontent.com/suxuang/myIPTV/refs/heads/main/ipv4.m3u` |
+| 4 | [iptv-org/iptv](https://github.com/iptv-org/iptv)（中文频道） | `https://iptv-org.github.io/iptv/languages/zho.m3u` |
+| 5 | [Kimentanm/aptv](https://github.com/Kimentanm/aptv) | `https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u` |
+| 6 | [zwc456baby/iptv_alive](https://github.com/zwc456baby/iptv_alive) | `https://raw.githubusercontent.com/zwc456baby/iptv_alive/refs/heads/master/live.m3u` |
+| 7 | [hujingguang/ChinaIPTV](https://github.com/hujingguang/ChinaIPTV) | `https://raw.githubusercontent.com/hujingguang/ChinaIPTV/main/cnTV_AutoUpdate.m3u8` |
+| 8 | tv.iill.top | `https://tv.iill.top/m3u/Gather` |
 
 - 排列顺序只为便于维护，不影响结果：同一频道始终按延迟选出最优地址，与源的先后无关。
 - 脚本只采集 `http://` / `https://` 地址，纯 `rtp://` 组播源或仅运营商内网可用的源不会产出任何频道，无需添加。

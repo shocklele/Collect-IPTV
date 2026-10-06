@@ -1264,6 +1264,7 @@ if __name__ == "__main__":
     # IPTV 文件 URL（您可以添加自己的文件 URL 列表）
     file_urls = [
         "https://gh-proxy.com/raw.githubusercontent.com/vbskycn/iptv/refs/heads/master/tv/iptv4.m3u",
+        "https://raw.githubusercontent.com/Guovin/iptv-api/gd/output/ipv4/result.m3u",
         "https://raw.githubusercontent.com/suxuang/myIPTV/refs/heads/main/ipv4.m3u",
         "https://iptv-org.github.io/iptv/languages/zho.m3u",
         "https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u",
