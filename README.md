@@ -38,12 +38,30 @@
 
 ## ⚙️ 工作原理
 
-1. **收集**：从多个公开的 M3U / TXT 节目源汇总频道与地址（源列表见 `.github/workflows/iptv.py` 末尾的 `file_urls`）
+1. **收集**：从多个公开的 M3U / TXT 节目源汇总频道与地址（源列表见下方[节目源](#-节目源)）
 2. **检测**：并发请求每条地址，过滤不可用的源并记录延迟
 3. **去重优选**：同一频道只保留延迟最低的一条地址（同等条件下优先 HTTPS）
 4. **分组**：按 央视频道 → 卫视频道 → 各省频道 → 主题频道（港澳台、文旅、新闻、体育、影视、少儿动漫、纪录人文、音乐、戏曲综艺）→ 其他频道 归类排序
 5. **台标**：台标取自 `https://epg.112114.xyz/logo/`，生成地址前会先规范化频道名（如 `CCTV-4 中文国际` → `CCTV4`）以提高命中率；图床未收录的频道不显示台标
 6. **发布**：写入 `best_sorted.m3u` / `best_sorted.m3u8`，更新本页的更新时间并自动提交
+
+## 📡 节目源
+
+当前使用的上游节目源（定义在 `.github/workflows/iptv.py` 末尾的 `file_urls`，按实测有效流数量从多到少排列）：
+
+| 顺序 | 上游 | 地址 |
+|---|---|---|
+| 1 | [vbskycn/iptv](https://github.com/vbskycn/iptv) | `https://gh-proxy.com/raw.githubusercontent.com/vbskycn/iptv/refs/heads/master/tv/iptv4.m3u` |
+| 2 | [suxuang/myIPTV](https://github.com/suxuang/myIPTV) | `https://raw.githubusercontent.com/suxuang/myIPTV/refs/heads/main/ipv4.m3u` |
+| 3 | [iptv-org/iptv](https://github.com/iptv-org/iptv)（中文频道） | `https://iptv-org.github.io/iptv/languages/zho.m3u` |
+| 4 | [Kimentanm/aptv](https://github.com/Kimentanm/aptv) | `https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u` |
+| 5 | [zwc456baby/iptv_alive](https://github.com/zwc456baby/iptv_alive) | `https://raw.githubusercontent.com/zwc456baby/iptv_alive/refs/heads/master/live.m3u` |
+| 6 | [hujingguang/ChinaIPTV](https://github.com/hujingguang/ChinaIPTV) | `https://raw.githubusercontent.com/hujingguang/ChinaIPTV/main/cnTV_AutoUpdate.m3u8` |
+| 7 | tv.iill.top | `https://tv.iill.top/m3u/Gather` |
+
+- 排列顺序只为便于维护，不影响结果：同一频道始终按延迟选出最优地址，与源的先后无关。
+- 脚本只采集 `http://` / `https://` 地址，纯 `rtp://` 组播源或仅运营商内网可用的源不会产出任何频道，无需添加。
+- 下载失败或返回非 200 的源会被跳过，不影响其余源；可在 Actions 日志中查看每个源的 `Source ...: 有效数/候选数`，长期为 0 的源建议移除。
 
 ## 📁 目录结构
 
@@ -61,7 +79,7 @@
 - **手动更新**：仓库 **Actions → IPTV Daily Update → Run workflow**
 - **fork 后首次使用**：先在 Actions 页面启用工作流；如自动提交时报 403，到 **Settings → Actions → General → Workflow permissions** 选择 **Read and write permissions**
 - **更换台标图床**：修改 `iptv.py` 中的 `LOGO_URL_TEMPLATE`
-- **增减节目源**：修改 `iptv.py` 末尾的 `file_urls`
+- **增减节目源**：修改 `iptv.py` 末尾的 `file_urls`，并同步更新上方[节目源](#-节目源)表格
 - **本地运行**：在仓库根目录执行
 
   ```bash
@@ -89,5 +107,6 @@
 ## 🙏 致谢与许可
 
 - 原项目：[zilong7728/Collect-IPTV](https://github.com/zilong7728/Collect-IPTV)
+- 节目源：见上方[节目源](#-节目源)列出的各上游项目
 - 台标来源：`epg.112114.xyz`
 - 本项目基于 [Apache License 2.0](./LICENSE) 开源
