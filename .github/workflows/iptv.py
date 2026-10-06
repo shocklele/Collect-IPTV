@@ -179,7 +179,7 @@ NON_GEO_TOKENS = {
 
 # 【修改点 3】扩充智能分类关键字，防止动漫、港澳台频道被错误归类为省份频道
 SMART_CATEGORY_KEYWORDS = {
-    "港澳台频道": ("翡翠台", "明珠台", "无线新闻", "有线新闻", "HOY", "VIU", "凤凰", "寰宇", "纬来", "东森", "中天", "台视", "华视", "民视", "三立", "非凡", "年代", "TVBS", "八大"),
+    "港澳台频道": ("翡翠台", "明珠台", "无线新闻", "有线新闻", "HOY", "VIU", "凤凰中文", "凤凰资讯", "凤凰香港", "凤凰电影", "凤凰卫视", "寰宇", "纬来", "东森", "中天", "台视", "华视", "民视", "三立", "非凡", "年代", "TVBS", "八大"),
     "文旅频道": ("古城", "古镇", "景区", "景点", "风景", "风光", "观景", "全景", "大佛", "雪山", "公园", "湿地", "湖景", "山景", "游览", "花布"),
     "新闻频道": ("新闻", "时政", "资讯", "观察", "焦点", "头条"),
     "体育频道": ("体育", "足球", "篮球", "网球", "高尔夫", "搏击", "赛事"),
@@ -548,6 +548,11 @@ GENERIC_CHANNEL_WORDS_PATTERN = re.compile(
 )
 
 
+# 与知名频道品牌重名的县区名（湖南凤凰县、株洲天元区），作为省份匹配词会把
+# 凤凰中文、天元围棋 这类全国性频道误判进湖南
+AMBIGUOUS_GEO_TOKENS = {normalize_text_for_match(name) for name in ("凤凰", "天元")}
+
+
 def is_generic_channel_token(token: str) -> bool:
     """去掉类型词后剩余不足 2 个字，说明该匹配词不含地域信息。"""
     return len(GENERIC_CHANNEL_WORDS_PATTERN.sub("", token)) < 2
@@ -579,7 +584,7 @@ def build_province_matchers(province_channels: Dict[str, Set[str]]) -> Dict[str,
         patterns = {
             pattern for pattern in patterns
             if pattern in normalized_aliases or not is_generic_channel_token(pattern)
-        }
+        } - AMBIGUOUS_GEO_TOKENS
         province_matchers[province] = sorted(patterns, key=len, reverse=True)
 
     return province_matchers
