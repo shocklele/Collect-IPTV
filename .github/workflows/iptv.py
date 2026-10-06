@@ -5,6 +5,7 @@ import time
 import json
 from collections import Counter, defaultdict
 import re
+from urllib.parse import urljoin
 from typing import Dict, Iterable, List, Optional, Set, Tuple, Any
 
 def contains_date(text):
@@ -27,6 +28,11 @@ CONFIG = {
     "timeout": 10,  # Timeout in seconds
     "max_parallel": 30,  # Max concurrent requests
     "output_file": "best_sorted.m3u",  # Output file for the sorted M3U
+    "source_retries": 3,  # 拉取上游源列表的最大尝试次数
+    "probe_bytes": 16384,  # 校验流内容时读取的字节数
+    "max_playlist_depth": 3,  # m3u8 嵌套（主列表 -> 子列表 -> 分片）最多跟进层数
+    # 部分上游会拦截非播放器 UA，这里模拟常见播放器
+    "user_agent": "VLC/3.0.20 LibVLC/3.0.20",
 }
 
 CHAR_NORMALIZATION_MAP = str.maketrans({
@@ -324,8 +330,12 @@ def is_cctv_channel(
     for token in normalized_cctv_channels:
         if len(token) >= 4 and token in normalized_channel:
             return True
+        # 上游常省略前缀，如 兵器科技 / 风云剧场 / 央视文化精品
+        bare = re.sub(r"^CCTV(?:央视)?", "", token)
+        if bare != token and len(bare) >= 4 and normalized_channel in (bare, "央视" + bare):
+            return True
 
-    return False
+    return normalized_channel.startswith(("CCTV", "CGTN", "CHC"))
 
 
 def resolve_province_aliases(province_name: str) -> Set[str]:
@@ -517,6 +527,32 @@ async def load_online_geo_tokens(
     return {}
 
 
+# 这些词只描述频道类型，不含地域信息；完全由它们组成的匹配词（如 财经、影院、国际）
+# 会把无关频道误判进某个省份，构建省份匹配词时需要剔除
+GENERIC_CHANNEL_WORDS = NON_GEO_TOKENS | {
+    "财经", "影院", "国际", "电视剧", "影视剧", "视剧", "电影", "剧场", "卫视", "文体", "文艺",
+    "青年", "青少", "青春", "女性", "家庭", "乡村", "农村", "农民", "农业", "农牧", "农科",
+    "经视", "记录", "纪实", "外语", "移动", "休闲", "社会", "政法", "时政", "法制", "科技",
+    "服务", "信息", "商务", "国家", "中国", "中华", "数字", "数码", "时代", "留学", "金色",
+    "电信", "联通", "IPTV", "广播", "融媒", "有线", "图文", "新综", "与", "和", "套", "影",
+    "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "｜", "‖", "Ⅰ",
+}
+GENERIC_CHANNEL_WORDS_PATTERN = re.compile(
+    "|".join(
+        re.escape(word)
+        for word in sorted(
+            {normalize_text_for_match(w) for w in GENERIC_CHANNEL_WORDS} - {""}, key=len, reverse=True
+        )
+    )
+    + r"|\d+"
+)
+
+
+def is_generic_channel_token(token: str) -> bool:
+    """去掉类型词后剩余不足 2 个字，说明该匹配词不含地域信息。"""
+    return len(GENERIC_CHANNEL_WORDS_PATTERN.sub("", token)) < 2
+
+
 def build_province_matchers(province_channels: Dict[str, Set[str]]) -> Dict[str, List[str]]:
     """构建省份频道匹配词，优先精确词，其次省份关键词兜底。"""
     province_matchers: Dict[str, List[str]] = {}
@@ -540,6 +576,10 @@ def build_province_matchers(province_channels: Dict[str, Set[str]]) -> Dict[str,
             if len(normalized_alias) >= 2:
                 patterns.add(normalized_alias)
 
+        patterns = {
+            pattern for pattern in patterns
+            if pattern in normalized_aliases or not is_generic_channel_token(pattern)
+        }
         province_matchers[province] = sorted(patterns, key=len, reverse=True)
 
     return province_matchers
@@ -548,16 +588,22 @@ def build_province_matchers(province_channels: Dict[str, Set[str]]) -> Dict[str,
 def match_province(normalized_channel: str, province_matchers: Dict[str, List[str]]) -> Optional[str]:
     """按最长匹配词命中省份，避免短词误判。"""
     best_match_province = None
-    best_score = 0
+    best_score: Tuple[int, int] = (0, 0)
 
     for province, patterns in province_matchers.items():
+        matched_len = 0
         for pattern in patterns:
-            if pattern in normalized_channel:
-                score = len(pattern)
-                if score > best_score:
-                    best_score = score
-                    best_match_province = province
+            if len(pattern) < matched_len:
                 break
+            position = normalized_channel.find(pattern)
+            if position < 0:
+                continue
+            matched_len = len(pattern)
+            # 同长度时取更靠前的词，避免 辽宁都市 被 宁都 抢走
+            score = (matched_len, -position)
+            if score > best_score:
+                best_score = score
+                best_match_province = province
 
     return best_match_province
 
@@ -600,9 +646,42 @@ def cctv_sort_key(channel_name: str) -> Tuple[Any, ...]:
     return (1, natural_sort_key(channel_name))
 
 
+QUALITY_SUFFIX_PATTERN = re.compile(
+    r"(?i)[\s\-_]*(?:IPV[46]|HEVC|H\.?265|H\.?264|HDR|UHD|FHD|HD|SD|\d{3,4}P|超高清|高清|超清|标清|蓝光)\s*$"
+)
+CCTV_NUMBERED_PATTERN = re.compile(r"(?i)^CCTV[\s\-]?(4K|8K|\d{1,2}\+?)(.*)$")
+CCTV_KEPT_SUFFIXES = ("欧洲", "美洲", "4K", "8K")
+
+
+def canonical_channel_name(channel: str) -> str:
+    """
+    统一同一频道的不同写法，用于去重和展示：
+    CCTV-4 中文国际 / CCTV4 高清 -> CCTV4，华视HD -> 华视，CGTN记录 -> CGTN纪录
+    """
+    name = channel.replace("＋", "+").strip()
+    while True:
+        stripped = QUALITY_SUFFIX_PATTERN.sub("", name).strip()
+        if not stripped or stripped == name:
+            break
+        name = stripped
+
+    match = CCTV_NUMBERED_PATTERN.match(name)
+    if match:
+        number, suffix = match.group(1).upper(), match.group(2).upper()
+        name = f"CCTV{number}"
+        # 只有 欧洲/美洲/4K 这类后缀代表独立频道，其余（综合、中文国际…）只是别名
+        for kept in CCTV_KEPT_SUFFIXES:
+            if kept in suffix and kept != number:
+                name += kept if kept in ("欧洲", "美洲") else f"-{kept}"
+                break
+    elif re.match(r"(?i)^CGTN[\s\-]?记录", name):
+        name = "CGTN纪录"
+    return name or channel
+
+
 def channel_identity_key(channel: str) -> str:
     """频道唯一键（用于去重与选优）。"""
-    return normalize_text_for_match(normalize_cctv_name(channel))
+    return normalize_text_for_match(canonical_channel_name(channel))
 
 
 def looks_like_notice_entry(channel: str, source_group_title: Optional[str] = None) -> bool:
@@ -735,10 +814,11 @@ def infer_group_from_upstream_title(
     if not normalized:
         return None
 
+    # 上游的"央视"分组常混入卫视和数字频道，不可靠，央视只按频道名判断
     if any(token in normalized for token in ("CCTV", "CGTN", "CHC")) or "央视" in raw_title:
-        return "央视频道"
+        return None
     if "卫视" in raw_title:
-        return "卫视频道"
+        return None
 
     province = match_province(normalized, province_matchers)
     if province:
@@ -808,10 +888,11 @@ def select_best_streams(valid_entries: Iterable[Dict[str, Any]]) -> List[Dict[st
 
         key = channel_identity_key(channel)
         current = best_by_channel.get(key)
-        if current is None:
-            best_by_channel[key] = dict(entry)
-        else:
-            best_by_channel[key] = choose_better_entry(current, entry)
+        best = dict(entry) if current is None else dict(choose_better_entry(current, entry))
+        if key.startswith(("CCTV", "CGTN")):
+            # 央视频道统一展示规范名，避免留下 CCTV-4 中文国际 这类别名
+            best["channel"] = canonical_channel_name(channel)
+        best_by_channel[key] = best
 
     selected = list(best_by_channel.values())
     selected.sort(key=lambda x: natural_sort_key(str(x.get("channel", ""))))
@@ -866,17 +947,82 @@ def extract_urls_from_m3u(content):
     return urls
 
 
+def detect_media_format(data: bytes) -> Optional[str]:
+    """根据文件头识别常见直播流封装格式。"""
+    if len(data) > 188 and data[0] == 0x47 and data[188] == 0x47:
+        return "ts"
+    if data[:3] == b"FLV":
+        return "flv"
+    if data[4:8] in (b"ftyp", b"styp", b"moof", b"sidx"):
+        return "mp4"
+    if data[:3] == b"ID3" or (len(data) > 1 and data[0] == 0xFF and data[1] & 0xF0 == 0xF0):
+        return "audio"
+    return None
+
+
+def first_playlist_uri(playlist_text: str, base_url: str) -> Optional[str]:
+    """取 m3u8 中第一条子列表/分片地址。"""
+    for line in playlist_text.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            return urljoin(base_url, line)
+    return None
+
+
+async def fetch_head(session: aiohttp.ClientSession, url: str):
+    """请求地址并读取开头一段内容，返回 (状态码, 内容, 最终地址, Content-Type, 响应耗时)。"""
+    start_time = time.time()
+    async with session.get(url, timeout=CONFIG["timeout"]) as response:
+        elapsed_time = time.time() - start_time
+        data = b""
+        if response.status == 200:
+            while len(data) < CONFIG["probe_bytes"]:
+                chunk = await response.content.read(CONFIG["probe_bytes"] - len(data))
+                if not chunk:
+                    break
+                data += chunk
+        return response.status, data, str(response.url), response.headers.get("Content-Type", "").lower(), elapsed_time
+
+
 # 测试 IPTV 链接的可用性和速度
 async def test_stream(session: aiohttp.ClientSession, semaphore: asyncio.Semaphore, url: str):
-    """测试 IPTV 链接的可用性和速度"""
+    """
+    测试 IPTV 链接的可用性和速度。
+    只有状态码 200 不够（失效页、指向网页的 m3u8 也会返回 200），
+    这里会跟进 m3u8 直到取到真正的媒体数据才算可用。
+    """
     async with semaphore:
-        start_time = time.time()
         try:
-            async with session.get(url, timeout=CONFIG["timeout"]) as response:
-                if response.status == 200:
-                    elapsed_time = time.time() - start_time
-                    return True, elapsed_time
-                return False, None
+            latency = None
+            current_url = url
+            for depth in range(CONFIG["max_playlist_depth"] + 1):
+                status, data, final_url, content_type, elapsed_time = await fetch_head(session, current_url)
+                for retry_delay in (2, 5):
+                    if status != 429:
+                        break
+                    # 被上游限流时稍等重试
+                    await asyncio.sleep(retry_delay)
+                    status, data, final_url, content_type, elapsed_time = await fetch_head(session, current_url)
+                if status != 200 or not data:
+                    return False, None
+                if latency is None:
+                    latency = elapsed_time
+
+                if data.lstrip(b"\xef\xbb\xbf \r\n\t").startswith(b"#EXTM3U"):
+                    next_url = first_playlist_uri(data.decode("utf-8", errors="ignore"), final_url)
+                    if not next_url or not next_url.startswith(("http://", "https://")):
+                        return False, None
+                    current_url = next_url
+                    continue
+
+                if detect_media_format(data):
+                    return True, latency
+                head = data[:512].lstrip().lower()
+                if head.startswith((b"<", b"{", b"[")) or any(t in content_type for t in ("html", "json", "xml")):
+                    return False, None
+                # 无法识别但确实是二进制数据（如加密分片），视为可用
+                return (True, latency) if b"\x00" in data[:2048] or len(data) >= 1024 else (False, None)
+            return False, None
         except asyncio.TimeoutError:
             return False, None
         except Exception:
@@ -900,15 +1046,28 @@ async def read_and_test_file(
     session: aiohttp.ClientSession,
     semaphore: asyncio.Semaphore,
     file_path: str,
-    is_m3u: bool = False
+    is_m3u: Optional[bool] = None
 ):
     """读取文件并提取 URL 进行测试"""
     try:
-        async with session.get(file_path, timeout=CONFIG["timeout"]) as response:
-            if response.status != 200:
-                return []
-            content = await response.text(errors="ignore")
+        content = None
+        for attempt in range(CONFIG["source_retries"]):
+            # 源列表偶发超时会让整批频道消失，失败时重试
+            try:
+                async with session.get(file_path, timeout=CONFIG["timeout"] * 2) as response:
+                    if response.status != 200:
+                        print(f"Source skipped (HTTP {response.status}): {file_path}")
+                        return []
+                    content = await response.text(errors="ignore")
+                    break
+            except (asyncio.TimeoutError, aiohttp.ClientError):
+                if attempt == CONFIG["source_retries"] - 1:
+                    raise
+                await asyncio.sleep(2)
 
+        if is_m3u is None:
+            # 地址没有扩展名（如 .../m3u/Gather）时按内容判断格式
+            is_m3u = "#EXTINF" in content or content.lstrip().startswith("#EXTM3U")
         if is_m3u:
             entries = extract_urls_from_m3u(content)
         else:
@@ -926,9 +1085,11 @@ async def read_and_test_file(
                     "latency": latency,
                 })
 
+        print(f"Source {file_path}: {len(valid_entries)}/{len(entries)} streams valid")
         return valid_entries
 
-    except Exception:
+    except Exception as exc:
+        print(f"Source failed ({type(exc).__name__}): {file_path}")
         return []
 
 
@@ -959,14 +1120,14 @@ def generate_sorted_m3u(valid_entries, cctv_channels, province_channels, filenam
         upstream_group = infer_group_from_upstream_title(source_group_title, province_matchers)
 
         # 根据频道名判断属于哪个分组
-        if is_cctv_channel(channel, normalized_channel, normalized_cctv_channels) or upstream_group == "央视频道":
+        if is_cctv_channel(channel, normalized_channel, normalized_cctv_channels):
             cctv_channels_list.append({
                 "channel": channel,
                 "url": url,
                 "logo": build_logo_url(channel),
                 "group_title": "央视频道"
             })
-        elif "卫视" in channel or upstream_group == "卫视频道":  # 卫视频道
+        elif "卫视" in channel:  # 卫视频道
             satellite_channels.append({
                 "channel": channel,
                 "url": url,
@@ -1066,7 +1227,12 @@ async def main(file_urls, cctv_channel_file, province_channel_files):
 
     timeout = aiohttp.ClientTimeout(total=CONFIG["timeout"])
     connector = aiohttp.TCPConnector(limit=CONFIG["max_parallel"] * 2)
-    async with aiohttp.ClientSession(cookie_jar=None, timeout=timeout, connector=connector) as session:
+    async with aiohttp.ClientSession(
+        cookie_jar=None,
+        timeout=timeout,
+        connector=connector,
+        headers={"User-Agent": CONFIG["user_agent"]},
+    ) as session:
         online_geo_tokens = await load_online_geo_tokens(session, province_channels)
         if online_geo_tokens:
             for province, tokens in online_geo_tokens.items():
@@ -1081,7 +1247,7 @@ async def main(file_urls, cctv_channel_file, province_channel_files):
             elif file_url.endswith('.txt'):
                 valid_entries = await read_and_test_file(session, semaphore, file_url, is_m3u=False)
             else:
-                valid_entries = []
+                valid_entries = await read_and_test_file(session, semaphore, file_url)
 
             all_valid_entries.extend(valid_entries)
 
