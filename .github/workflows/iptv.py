@@ -258,6 +258,12 @@ CHANNEL_NAME_MARKERS = (
 
 
 # 读取 CCTV 频道列表
+# 台标图床地址（{name} 会被替换为频道名），如需更换图床只改这里
+LOGO_URL_TEMPLATE = "https://epg.112114.xyz/logo/{name}.png"
+
+def build_logo_url(channel: str) -> str:
+    return LOGO_URL_TEMPLATE.format(name=channel)
+
 def load_cctv_channels(file_path=".github/workflows/IPTV/CCTV.txt"):
     """从文件加载 CCTV 频道列表"""
     cctv_channels = set()
@@ -936,14 +942,14 @@ def generate_sorted_m3u(valid_entries, cctv_channels, province_channels, filenam
             cctv_channels_list.append({
                 "channel": channel,
                 "url": url,
-                "logo": f"https://live.fanmingming.cn/tv/{channel}.png",
+                "logo": build_logo_url(channel),
                 "group_title": "央视频道"
             })
         elif "卫视" in channel or upstream_group == "卫视频道":  # 卫视频道
             satellite_channels.append({
                 "channel": channel,
                 "url": url,
-                "logo": f"https://live.fanmingming.cn/tv/{channel}.png",
+                "logo": build_logo_url(channel),
                 "group_title": "卫视频道"
             })
         else:
@@ -952,7 +958,7 @@ def generate_sorted_m3u(valid_entries, cctv_channels, province_channels, filenam
                 province_channels_list[province].append({
                     "channel": channel,
                     "url": url,
-                    "logo": f"https://live.fanmingming.cn/tv/{channel}.png",
+                    "logo": build_logo_url(channel),
                     "group_title": f"{province}"
                 })
             else:
@@ -961,14 +967,14 @@ def generate_sorted_m3u(valid_entries, cctv_channels, province_channels, filenam
                     smart_category_channels[smart_category].append({
                         "channel": channel,
                         "url": url,
-                        "logo": f"https://live.fanmingming.cn/tv/{channel}.png",
+                        "logo": build_logo_url(channel),
                         "group_title": smart_category
                     })
                 else:
                     other_channels.append({
                         "channel": channel,
                         "url": url,
-                        "logo": f"https://live.fanmingming.cn/tv/{channel}.png",
+                        "logo": build_logo_url(channel),
                         "group_title": "其他频道"
                     })
 

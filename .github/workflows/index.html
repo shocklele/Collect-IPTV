@@ -153,22 +153,22 @@
             });
         }
 
-        // --- 核心更新：引入范明明台标库并实现智能回退 ---
+        // --- 核心更新：引入台标图床并实现智能回退 ---
         function getLogoHtml(channel) {
             // 基础清理：去掉频道名中自带的如 (测试)、[高清]、-HD 等后缀，增加匹配率
             const cleanName = channel.name.replace(/\[.*?\]|\(.*?\)|-FHD|-HD| FHD| HD| 4K| 8K/gi, '').trim();
-            // 针对范明明库优化的 CCTV 名称规范 (如将 CCTV-1 转换为 CCTV1)
+            // 针对台标库优化的 CCTV 名称规范 (如将 CCTV-1 转换为 CCTV1)
             const cctvName = cleanName.replace(/CCTV-(\d+.*)/i, 'CCTV$1');
 
-            const fanmingUrlClean = `https://raw.githubusercontent.com/fanmingming/live/refs/heads/main/tv/${encodeURIComponent(cleanName)}.png`;
-            const fanmingUrlCctv = `https://raw.githubusercontent.com/fanmingming/live/refs/heads/main/tv/${encodeURIComponent(cctvName)}.png`;
+            const logoUrlBackup = `https://livecdn.zbds.top/logo/${encodeURIComponent(cctvName)}.png`;
+            const logoUrlMain = `https://epg.112114.xyz/logo/${encodeURIComponent(cctvName)}.png`;
 
-            // 初始请求地址：如果源文件带 tvg-logo 则优先用源的，否则直接用优化的范明明链接
-            const initialSrc = channel.logo || fanmingUrlCctv;
+            // 初始请求地址：如果源文件带 tvg-logo 则优先用源的，否则直接用主图床链接
+            const initialSrc = channel.logo || logoUrlMain;
 
             // onerror 触发容错机制：
-            // 第一步失败 -> 尝试范明明的规范化 CCTV 链接
-            // 第二步失败 -> 尝试范明明的纯净版名称链接
+            // 第一步失败 -> 尝试主图床 (epg.112114.xyz) 的规范化名称链接
+            // 第二步失败 -> 尝试备用图床 (livecdn.zbds.top) 链接
             // 全部失败   -> 渲染"无图标"纯文本
             return `<img 
                 src="${initialSrc}" 
@@ -178,10 +178,10 @@
                 onerror="
                     if (!this.dataset.retry1) {
                         this.dataset.retry1 = '1';
-                        this.src = '${fanmingUrlCctv}';
+                        this.src = '${logoUrlMain}';
                     } else if (!this.dataset.retry2) {
                         this.dataset.retry2 = '1';
-                        this.src = '${fanmingUrlClean}';
+                        this.src = '${logoUrlBackup}';
                     } else {
                         this.onerror = null;
                         this.outerHTML = '<span class=\\'text-xs text-gray-400\\'>无</span>';
