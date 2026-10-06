@@ -261,8 +261,29 @@ CHANNEL_NAME_MARKERS = (
 # 台标图床地址（{name} 会被替换为频道名），如需更换图床只改这里
 LOGO_URL_TEMPLATE = "https://epg.112114.xyz/logo/{name}.png"
 
+def normalize_logo_name(channel: str) -> str:
+    """将频道名规范化为图床使用的台标名，例如 CCTV-4 中文国际 -> CCTV4"""
+    # 去掉括号备注，如 1905电影网（国内）
+    name = re.sub(r"[（(【\[][^\])）】]*[)）】\]]", "", channel).strip()
+    # 去掉末尾的清晰度标记，如 华视HD、TVB翡翠台 1080P
+    name = re.sub(
+        r"(?i)[\s\-_]*(?:IPV6|HEVC|H\.?265|H\.?264|HDR|UHD|FHD|HD|SD|\d{3,4}P|超高清|高清|超清|标清|蓝光)\s*$",
+        "",
+        name,
+    ).strip()
+    # CCTV 数字频道统一为 CCTV+编号，仅保留 欧洲/美洲 这类独立台标的后缀
+    cctv_match = re.match(r"(?i)^CCTV[\s\-]?(4K|8K|\d{1,2}\+?)(.*)$", name)
+    if cctv_match:
+        suffix = cctv_match.group(2).strip()
+        name = f"CCTV{cctv_match.group(1).upper()}"
+        if suffix in ("欧洲", "美洲"):
+            name += suffix
+    name = re.sub(r"卫视台$", "卫视", name)
+    return name or channel
+
+
 def build_logo_url(channel: str) -> str:
-    return LOGO_URL_TEMPLATE.format(name=channel)
+    return LOGO_URL_TEMPLATE.format(name=normalize_logo_name(channel))
 
 def load_cctv_channels(file_path=".github/workflows/IPTV/CCTV.txt"):
     """从文件加载 CCTV 频道列表"""
