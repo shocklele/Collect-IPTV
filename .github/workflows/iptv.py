@@ -1275,8 +1275,7 @@ if __name__ == "__main__":
         "https://iptv-org.github.io/iptv/languages/zho.m3u",
         "https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u",
         "https://raw.githubusercontent.com/zwc456baby/iptv_alive/refs/heads/master/live.m3u",
-        "https://raw.githubusercontent.com/hujingguang/ChinaIPTV/main/cnTV_AutoUpdate.m3u8",
-        "https://tv.iill.top/m3u/Gather"
+        "https://raw.githubusercontent.com/hujingguang/ChinaIPTV/main/cnTV_AutoUpdate.m3u8"
     ]
 
     # CCTV 频道文件（例如 IPTV/CCTV.txt）

@@ -59,7 +59,6 @@
 | 6 | [Kimentanm/aptv](https://github.com/Kimentanm/aptv) | `https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u` |
 | 7 | [zwc456baby/iptv_alive](https://github.com/zwc456baby/iptv_alive) | `https://raw.githubusercontent.com/zwc456baby/iptv_alive/refs/heads/master/live.m3u` |
 | 8 | [hujingguang/ChinaIPTV](https://github.com/hujingguang/ChinaIPTV) | `https://raw.githubusercontent.com/hujingguang/ChinaIPTV/main/cnTV_AutoUpdate.m3u8` |
-| 9 | tv.iill.top | `https://tv.iill.top/m3u/Gather` |
 
 - 排列顺序只为便于维护，不影响结果：同一频道始终按延迟选出最优地址，与源的先后无关。
 - 脚本只采集 `http://` / `https://` 地址，纯 `rtp://` 组播源或仅运营商内网可用的源不会产出任何频道，无需添加。
