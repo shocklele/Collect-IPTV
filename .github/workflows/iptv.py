@@ -5,7 +5,7 @@ import time
 import json
 from collections import Counter, defaultdict
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 from typing import Dict, Iterable, List, Optional, Set, Tuple, Any
 
 def contains_date(text):
@@ -28,6 +28,7 @@ CONFIG = {
     "timeout": 10,  # Timeout in seconds
     "max_parallel": 30,  # Max concurrent requests
     "output_file": "best_sorted.m3u",  # Output file for the sorted M3U
+    "streams_per_channel": 3,  # 每个频道保留的线路数（首条最优，其余为备用）
     "source_retries": 3,  # 拉取上游源列表的最大尝试次数
     "probe_bytes": 16384,  # 校验流内容时读取的字节数
     "max_playlist_depth": 3,  # m3u8 嵌套（主列表 -> 子列表 -> 分片）最多跟进层数
@@ -676,6 +677,8 @@ def canonical_channel_name(channel: str) -> str:
     match = CCTV_NUMBERED_PATTERN.match(name)
     if match:
         number, suffix = match.group(1).upper(), match.group(2).upper()
+        if number[0] == "0" and len(number) > 1:
+            number = number.lstrip("0") or "0"  # CCTV-01 -> CCTV1
         name = f"CCTV{number}"
         # 只有 欧洲/美洲/4K 这类后缀代表独立频道，其余（综合、中文国际…）只是别名
         for kept in CCTV_KEPT_SUFFIXES:
@@ -867,45 +870,76 @@ def deduplicate_candidate_entries(entries: Iterable[Dict[str, Any]]) -> List[Dic
     return deduplicated
 
 
-def choose_better_entry(current_best: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[str, Any]:
-    best_latency = current_best.get("latency")
-    cand_latency = candidate.get("latency")
-    best_score = (
-        best_latency if isinstance(best_latency, (int, float)) else float("inf"),
-        0 if str(current_best.get("url", "")).startswith("https://") else 1,
-        len(str(current_best.get("url", ""))),
+def stream_score(entry: Dict[str, Any]) -> Tuple[float, int, int]:
+    """线路优劣排序键：延迟低优先，其次 https，再次地址短。"""
+    latency = entry.get("latency")
+    url = str(entry.get("url", ""))
+    return (
+        latency if isinstance(latency, (int, float)) else float("inf"),
+        0 if url.startswith("https://") else 1,
+        len(url),
     )
-    cand_score = (
-        cand_latency if isinstance(cand_latency, (int, float)) else float("inf"),
-        0 if str(candidate.get("url", "")).startswith("https://") else 1,
-        len(str(candidate.get("url", ""))),
-    )
-    return candidate if cand_score < best_score else current_best
 
 
-def select_best_streams(valid_entries: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def select_best_streams(
+    valid_entries: Iterable[Dict[str, Any]],
+    per_channel: Optional[int] = None,
+) -> List[Dict[str, Any]]:
     """
     去重并选优：
     1) 同频道同 URL 去重
-    2) 同频道保留最低延迟（并优先 https）的最佳 URL
+    2) 同频道按延迟（并优先 https）排序，保留前 per_channel 条线路
+    3) 备用线路优先取不同服务器的地址，避免一台服务器故障时全部失效
     """
-    best_by_channel: Dict[str, Dict[str, Any]] = {}
+    if per_channel is None:
+        per_channel = CONFIG["streams_per_channel"]
+    per_channel = max(1, int(per_channel))
 
+    by_channel: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for entry in valid_entries:
         channel = sanitize_channel_name(str(entry.get("channel", "")).strip())
         url = str(entry.get("url", "")).strip()
         if not channel or not url:
             continue
+        by_channel[channel_identity_key(channel)].append(entry)
 
-        key = channel_identity_key(channel)
-        current = best_by_channel.get(key)
-        best = dict(entry) if current is None else dict(choose_better_entry(current, entry))
+    selected: List[Dict[str, Any]] = []
+    for key, candidates in by_channel.items():
+        ranked: List[Dict[str, Any]] = []
+        seen_urls: Set[str] = set()
+        for entry in sorted(candidates, key=stream_score):
+            url = str(entry.get("url", "")).strip()
+            if url not in seen_urls:
+                seen_urls.add(url)
+                ranked.append(entry)
+
+        picked: List[Dict[str, Any]] = []
+        seen_hosts: Set[str] = set()
+        for entry in ranked:
+            host = urlsplit(str(entry.get("url", "")).strip()).netloc.lower()
+            if host not in seen_hosts:
+                seen_hosts.add(host)
+                picked.append(entry)
+        # 不同服务器的线路不足时，用同服务器的其他线路补齐
+        if len(picked) < per_channel:
+            extras = [e for e in ranked if e not in picked]
+            picked = sorted(picked + extras[:per_channel - len(picked)], key=stream_score)
+        picked = picked[:per_channel]
+
+        # 同一频道的各条线路统一用最优线路的频道名，播放器才能识别为同一频道的多条线路
+        name = sanitize_channel_name(str(picked[0].get("channel", "")).strip())
         if key.startswith(("CCTV", "CGTN")):
             # 央视频道统一展示规范名，避免留下 CCTV-4 中文国际 这类别名
-            best["channel"] = canonical_channel_name(channel)
-        best_by_channel[key] = best
+            name = canonical_channel_name(name)
+        # 上游分组也统一，否则同一频道的线路可能被分到不同分组
+        group_title = next((e.get("source_group_title") for e in picked if e.get("source_group_title")), None)
+        for entry in picked:
+            line = dict(entry)
+            line["channel"] = name
+            line["source_group_title"] = group_title
+            selected.append(line)
 
-    selected = list(best_by_channel.values())
+    # sort 是稳定排序，同名线路保持上面的优劣顺序
     selected.sort(key=lambda x: natural_sort_key(str(x.get("channel", ""))))
     return selected
 
@@ -1199,7 +1233,8 @@ def generate_sorted_m3u(valid_entries, cctv_channels, province_channels, filenam
         with open(fname, 'w', encoding='utf-8') as f:
             f.write("#EXTM3U\n")
             f.write(f"# Generated-Time: {generated_at}\n")
-            f.write(f"# Channel-Count: {len(all_channels)}\n")
+            f.write(f"# Channel-Count: {len({info['channel'] for info in all_channels})}\n")
+            f.write(f"# Stream-Count: {len(all_channels)}\n")
             for channel_info in all_channels:
                 f.write(
                     f"#EXTINF:-1 tvg-name=\"{channel_info['channel']}\" tvg-logo=\"{channel_info['logo']}\" group-title=\"{channel_info['group_title']}\",{channel_info['channel']}\n")
@@ -1264,7 +1299,11 @@ async def main(file_urls, cctv_channel_file, province_channel_files):
 
     deduplicated_entries = deduplicate_candidate_entries(all_valid_entries)
     best_entries = select_best_streams(deduplicated_entries)
-    print(f"Valid streams: {len(all_valid_entries)}, deduplicated: {len(deduplicated_entries)}, best-per-channel: {len(best_entries)}")
+    channel_count = len({channel_identity_key(str(entry.get("channel", ""))) for entry in best_entries})
+    print(
+        f"Valid streams: {len(all_valid_entries)}, deduplicated: {len(deduplicated_entries)}, "
+        f"channels: {channel_count}, kept streams: {len(best_entries)} (up to {CONFIG['streams_per_channel']} per channel)"
+    )
 
     # 生成排序后的 M3U 文件
     generate_sorted_m3u(best_entries, cctv_channels, province_channels, CONFIG["output_file"])
