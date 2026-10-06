@@ -110,7 +110,7 @@ PROVINCE_ALIASES = {
     "山东": {"山东台", "齐鲁"},
     "河南": {"河南台", "中原"},
     "湖北": {"湖北台"},
-    "湖南": {"湖南台"},
+    "湖南": {"湖南台", "凤凰古城"},
     "广东": {"广东台", "南粤"},
     "广西": {"广西台"},
     "海南": {"海南台"},
@@ -250,6 +250,9 @@ BLOCKED_M3U_KEYWORDS = (
     "免费订阅", "免費訂閲", "免費訂閱", "温馨提示", "溫馨提示", "建議使用", "建议使用",
     "请勿贩卖", "請勿販賣", "请勿频繁切换", "請勿頻繁切換", "个人觀看", "個人觀看", "刀刀影院"
 )
+
+# 上游 MTV 类分组里的单曲/歌曲合集（如 DJ版《蜜雪冰城》、2021热门伤感DJ），不是电视频道
+SONG_ENTRY_PATTERN = re.compile(r"(?i)[《「]|(?<![A-Z])DJ(?![A-Z])|伤感|情歌|舞曲|歌曲")
 
 BLOCKED_M3U_KEYWORDS_NORMALIZED = tuple(
     normalize_text_for_match(keyword) for keyword in BLOCKED_M3U_KEYWORDS
@@ -548,9 +551,9 @@ GENERIC_CHANNEL_WORDS_PATTERN = re.compile(
 )
 
 
-# 与知名频道品牌重名的县区名（湖南凤凰县、株洲天元区），作为省份匹配词会把
-# 凤凰中文、天元围棋 这类全国性频道误判进湖南
-AMBIGUOUS_GEO_TOKENS = {normalize_text_for_match(name) for name in ("凤凰", "天元")}
+# 与知名频道品牌或通用词重名的县区名（湖南凤凰县、株洲天元区、丽江古城区），作为省份
+# 匹配词会把 凤凰中文、天元围棋、凤凰古城 这类无关频道误判进对应省份
+AMBIGUOUS_GEO_TOKENS = {normalize_text_for_match(name) for name in ("凤凰", "天元", "古城")}
 
 
 def is_generic_channel_token(token: str) -> bool:
@@ -690,7 +693,10 @@ def channel_identity_key(channel: str) -> str:
 
 
 def looks_like_notice_entry(channel: str, source_group_title: Optional[str] = None) -> bool:
-    """过滤订阅提示、维护公告、更新时间等非频道条目。"""
+    """过滤订阅提示、维护公告、更新时间、歌曲合集等非频道条目。"""
+    if SONG_ENTRY_PATTERN.search(str(channel or "")):
+        return True
+
     haystacks = [channel]
     if source_group_title:
         haystacks.append(source_group_title)
