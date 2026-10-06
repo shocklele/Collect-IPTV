@@ -1275,11 +1275,14 @@ if __name__ == "__main__":
     # IPTV 文件 URL（您可以添加自己的文件 URL 列表）
     file_urls = [
         "https://raw.githubusercontent.com/CCSH/IPTV/refs/heads/main/live.m3u",
+        "https://raw.githubusercontent.com/alantang1977/JunTV/main/output/result.m3u",
         "https://gh-proxy.com/raw.githubusercontent.com/vbskycn/iptv/refs/heads/master/tv/iptv4.m3u",
         "https://raw.githubusercontent.com/Guovin/iptv-api/gd/output/ipv4/result.m3u",
         "https://raw.githubusercontent.com/suxuang/myIPTV/refs/heads/main/ipv4.m3u",
+        "https://raw.githubusercontent.com/zbefine/iptv/main/iptv.m3u",
         "https://raw.githubusercontent.com/best-fan/iptv-sources/master/cn_all.m3u8",
         "https://iptv-org.github.io/iptv/languages/zho.m3u",
+        "https://raw.githubusercontent.com/imDazui/Tvlist-awesome-m3u-m3u8/master/m3u/台湾香港澳门202506.m3u",
         "https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u",
         "https://raw.githubusercontent.com/zwc456baby/iptv_alive/refs/heads/master/live.m3u",
         "https://raw.githubusercontent.com/hujingguang/ChinaIPTV/main/cnTV_AutoUpdate.m3u8"
