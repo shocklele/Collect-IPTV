@@ -1,10 +1,73 @@
 # 📡 Collect-IPTV
 
-初始版本基于 DeepSeek 与 ChatGPT 生成，最新版本使用 Gemini 与 GPT-5.3-Codex 持续优化；依托 GitHub 服务器进行源地址可用性与延迟测试，网页已更新台标展示，并支持去重与优选低延迟最佳 URL，M3U 播放列表每 4 小时自动更新。
+自动收集互联网上公开的 IPTV 节目源，借助 GitHub Actions 检测可用性与延迟，去重后为每个频道保留延迟最低的一条地址，生成带分组和台标的 M3U 播放列表，每 4 小时自动更新一次。
 
-> ⚠️ **特别说明：** 因使用 GitHub 服务器，**不保证国内网络环境下的链接速度与可用性**。  
+本仓库 fork 自 [zilong7728/Collect-IPTV](https://github.com/zilong7728/Collect-IPTV)，在其基础上更换了台标图床并增加了台标名规范化。
+
+> ⚠️ **特别说明：** 检测在 GitHub 服务器上进行，**不保证国内网络环境下的链接速度与可用性**。  
 > ⚠️ **部分节目源来自互联网公开资源，上游源可能自行添加广告、弹窗、二维码或“赞助”提示。此类内容由上游节目源提供，与本项目及项目作者本人无关，本项目未主动添加、推广或收取相关赞助。**  
 > ⚠️ 所有频道的完整性与有效性高度依赖上游网络资源；若上游频道源大面积失效，自动更新时可能会被可用性检测过滤。
+
+---
+
+## 🔗 订阅地址
+
+<!-- Generated File Link M3U --> [View M3U File](https://raw.githubusercontent.com/shocklele/Collect-IPTV/refs/heads/main/best_sorted.m3u)
+
+<!-- Generated File Link M3U8 --> [View M3U8 File](https://raw.githubusercontent.com/shocklele/Collect-IPTV/refs/heads/main/best_sorted.m3u8)
+
+两个文件内容相同，只是扩展名不同，按播放器支持的格式任选其一。
+
+## ⏱️ 最近更新时间
+
+<!-- Last Run Time --> 2026-10-06 15:55:14 CST
+
+## 💡 使用说明
+
+1. 复制上方订阅地址，或下载对应的 M3U / M3U8 文件
+2. 导入支持 IPTV 的播放器（如 Kodi、PotPlayer、Perfect Player、APTV 等）
+3. 节目源每 4 小时自动更新，使用订阅地址的播放器刷新即可；下载文件的方式建议定期重新下载
+
+## 📺 频道列表网页
+
+<https://shocklele.github.io/Collect-IPTV/>
+
+网页可按格式、分组筛选并搜索频道，同时展示台标。该页面由 `Deploy static content to Pages` 工作流部署，需要先在仓库 **Settings → Pages** 中把 **Source** 设为 **GitHub Actions** 才能访问。
+
+---
+
+## ⚙️ 工作原理
+
+1. **收集**：从多个公开的 M3U / TXT 节目源汇总频道与地址（源列表见 `.github/workflows/iptv.py` 末尾的 `file_urls`）
+2. **检测**：并发请求每条地址，过滤不可用的源并记录延迟
+3. **去重优选**：同一频道只保留延迟最低的一条地址（同等条件下优先 HTTPS）
+4. **分组**：按 央视频道 → 卫视频道 → 各省频道 → 主题频道（港澳台、文旅、新闻、体育、影视、少儿动漫、纪录人文、音乐、戏曲综艺）→ 其他频道 归类排序
+5. **台标**：台标取自 `https://epg.112114.xyz/logo/`，生成地址前会先规范化频道名（如 `CCTV-4 中文国际` → `CCTV4`）以提高命中率；图床未收录的频道不显示台标
+6. **发布**：写入 `best_sorted.m3u` / `best_sorted.m3u8`，更新本页的更新时间并自动提交
+
+## 📁 目录结构
+
+| 路径 | 说明 |
+|---|---|
+| `best_sorted.m3u` / `best_sorted.m3u8` | 自动生成的播放列表 |
+| `.github/workflows/iptv.yml` | 定时任务（每 4 小时），也可手动触发 |
+| `.github/workflows/iptv.py` | 收集、检测、分组与生成脚本 |
+| `.github/workflows/IPTV/` | 央视及各省频道名单，用于分组 |
+| `.github/workflows/index.html` | 频道列表网页 |
+| `.github/workflows/static.yml` | 将网页部署到 GitHub Pages |
+
+## 🛠️ 自行部署与调整
+
+- **手动更新**：仓库 **Actions → IPTV Daily Update → Run workflow**
+- **fork 后首次使用**：先在 Actions 页面启用工作流；如自动提交时报 403，到 **Settings → Actions → General → Workflow permissions** 选择 **Read and write permissions**
+- **更换台标图床**：修改 `iptv.py` 中的 `LOGO_URL_TEMPLATE`
+- **增减节目源**：修改 `iptv.py` 末尾的 `file_urls`
+- **本地运行**：在仓库根目录执行
+
+  ```bash
+  pip install aiohttp
+  python .github/workflows/iptv.py
+  ```
 
 ---
 
@@ -23,30 +86,8 @@
 
 详细免责声明请参阅 [`DISCLAIMER.md`](./DISCLAIMER.md)。
 
----
+## 🙏 致谢与许可
 
-## 📺 TV station list
-
-https://zilong7728.github.io/Collect-IPTV/
-
-## ⏱️ Last Run Time
-
-<!-- Last Run Time --> 2026-10-06 15:55:14 CST
-
-## 🔗 Generated File Link
-
-<!-- Generated File Link --> [View Generated File](https://raw.githubusercontent.com/zilong7728/Collect-IPTV/refs/heads/main/best_sorted.m3u)
-
-<!-- Generated File Link m3u8 --> [View Generated File](https://raw.githubusercontent.com/zilong7728/Collect-IPTV/refs/heads/main/best_sorted.m3u8)
-
-## 💡 使用说明
-
-1. 点击上方「下载 M3U/M3U8 文件」获取最新节目源
-2. 将文件导入支持 IPTV 的播放器（如 Kodi、PotPlayer、Perfect Player 等）
-3. 节目源每 4 小时自动更新，建议定期重新下载
-
----
-
-## ⭐️ Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=zilong7728/Collect-IPTV&type=Date)](https://star-history.com/#zilong7728/Collect-IPTV&Date)
+- 原项目：[zilong7728/Collect-IPTV](https://github.com/zilong7728/Collect-IPTV)
+- 台标来源：`epg.112114.xyz`
+- 本项目基于 [Apache License 2.0](./LICENSE) 开源
