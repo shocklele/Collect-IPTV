@@ -83,6 +83,7 @@ M3U 与 M3U8 文件内容相同，只是扩展名不同，按播放器支持的�
 | 10 | [Kimentanm/aptv](https://github.com/Kimentanm/aptv) | `https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u` |
 | 11 | [zwc456baby/iptv_alive](https://github.com/zwc456baby/iptv_alive) | `https://raw.githubusercontent.com/zwc456baby/iptv_alive/refs/heads/master/live.m3u` |
 | 12 | [hujingguang/ChinaIPTV](https://github.com/hujingguang/ChinaIPTV) | `https://raw.githubusercontent.com/hujingguang/ChinaIPTV/main/cnTV_AutoUpdate.m3u8` |
+| 13 | [zzgpy1/ITV](https://github.com/zzgpy1/ITV) | `https://raw.githubusercontent.com/zzgpy1/ITV/refs/heads/main/output/tv.m3u` |
 
 - 排列顺序只为便于维护，不影响结果：同一频道始终按延迟选出最优地址，与源的先后无关。
 - 脚本只采集 `http://` / `https://` 地址，纯 `rtp://` 组播源或仅运营商内网可用的源不会产出任何频道，无需添加。
