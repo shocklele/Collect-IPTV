@@ -12,11 +12,31 @@
 
 ## 🔗 订阅地址
 
-<!-- Generated File Link M3U --> [View M3U File](https://raw.githubusercontent.com/shocklele/Collect-IPTV/refs/heads/main/best_sorted.m3u)
+**M3U**
 
-<!-- Generated File Link M3U8 --> [View M3U8 File](https://raw.githubusercontent.com/shocklele/Collect-IPTV/refs/heads/main/best_sorted.m3u8)
+<!-- Generated File Link M3U -->
+```text
+https://raw.githubusercontent.com/shocklele/Collect-IPTV/refs/heads/main/best_sorted.m3u
+```
 
-两个文件内容相同，只是扩展名不同，按播放器支持的格式任选其一。
+**M3U8**
+
+<!-- Generated File Link M3U8 -->
+```text
+https://raw.githubusercontent.com/shocklele/Collect-IPTV/refs/heads/main/best_sorted.m3u8
+```
+
+**jsDelivr CDN 镜像**（raw.githubusercontent.com 访问不畅时可用，更新可能有几分钟延迟）
+
+```text
+https://cdn.jsdelivr.net/gh/shocklele/Collect-IPTV@main/best_sorted.m3u
+```
+
+```text
+https://cdn.jsdelivr.net/gh/shocklele/Collect-IPTV@main/best_sorted.m3u8
+```
+
+M3U 与 M3U8 文件内容相同，只是扩展名不同，按播放器支持的格式任选其一。点击代码框右上角的复制按钮即可复制地址。
 
 ## ⏱️ 最近更新时间
 

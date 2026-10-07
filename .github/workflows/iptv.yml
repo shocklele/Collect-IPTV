@@ -28,8 +28,9 @@ jobs:
         file_link="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/best_sorted.m3u"  # 生成的文件是 best_sorted.m3u
         file_link1="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref }}/best_sorted.m3u8"  # 生成的文件是 best_sorted.m3u
         sed -i "s|<!-- Last Run Time -->.*|<!-- Last Run Time --> ${GET_TIME}|" README.md
-        sed -i "s|<!-- Generated File Link M3U -->.*|<!-- Generated File Link M3U --> [View M3U File](${file_link})|" README.md
-        sed -i "s|<!-- Generated File Link M3U8 -->.*|<!-- Generated File Link M3U8 --> [View M3U8 File](${file_link1})|" README.md
+        # 标记行之后依次是 ```text 行和地址行，替换地址行
+        sed -i "/<!-- Generated File Link M3U -->/{n;n;s|.*|${file_link}|}" README.md
+        sed -i "/<!-- Generated File Link M3U8 -->/{n;n;s|.*|${file_link1}|}" README.md
     - name: Commit changes
       env:
         REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
