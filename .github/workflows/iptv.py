@@ -28,7 +28,7 @@ CONFIG = {
     "timeout": 10,  # Timeout in seconds
     "max_parallel": 30,  # Max concurrent requests
     "output_file": "best_sorted.m3u",  # Output file for the sorted M3U
-    "streams_per_channel": 3,  # 每个频道保留的线路数（首条最优，其余为备用）
+    "streams_per_channel": 5,  # 每个频道保留的线路数（首条最优，其余为备用）
     "source_retries": 3,  # 拉取上游源列表的最大尝试次数
     "probe_bytes": 16384,  # 校验流内容时读取的字节数
     "max_playlist_depth": 3,  # m3u8 嵌套（主列表 -> 子列表 -> 分片）最多跟进层数
