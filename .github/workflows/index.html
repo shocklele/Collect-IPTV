@@ -299,15 +299,16 @@
         }
 
 		function extractUrlFromReadme(readmeText, format) {
-			const regexList = format === 'm3u'
-				? [
-					/\s*\[.*?\]\((https:\/\/[^)]+\.m3u(?:\?[^)]*)?)\)/i,
-					/\s*\[.*?\]\((https:\/\/[^)]+\.m3u(?:\?[^)]*)?)\)/i
-				  ]
-				: [
-					/\s*\[.*?\]\((https:\/\/[^)]+\.m3u8(?:\?[^)]*)?)\)/i,
-					/\s*\[.*?\]\((https:\/\/[^)]+\.m3u8(?:\?[^)]*)?)\)/i
-				  ];
+			const ext = format === 'm3u' ? 'm3u' : 'm3u8';
+			const marker = format === 'm3u' ? 'Generated File Link M3U' : 'Generated File Link M3U8';
+			const regexList = [
+				// 标记后的代码块：<!-- marker -->\n```text\nURL\n```
+				new RegExp(`<!--\\s*${marker}\\s*-->\\s*\\n\`\`\`[^\\n]*\\n\\s*(https:\\/\\/[^\\s\`]+\\.${ext}(?:\\?[^\\s\`]*)?)\\s*\\n\`\`\``, 'i'),
+				// 兼容旧格式：<!-- marker --> [text](URL)
+				new RegExp(`<!--\\s*${marker}\\s*-->\\s*\\[.*?\\]\\((https:\\/\\/[^)]+\\.${ext}(?:\\?[^)]*)?)\\)`, 'i'),
+				// 兜底：任意 Markdown 链接
+				new RegExp(`\\[.*?\\]\\((https:\\/\\/[^)]+\\.${ext}(?:\\?[^)]*)?)\\)`, 'i')
+			];
 
 			for (const regex of regexList) {
 				const match = readmeText.match(regex);
