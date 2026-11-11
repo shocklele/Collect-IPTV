@@ -1,7 +1,8 @@
 name: IPTV Daily Update
 on:
   schedule:
-    - cron: '0 */4 * * *'  
+    # GitHub Actions 的 cron 使用 UTC 时间：19:00 UTC = 次日 03:00 北京时间（Asia/Shanghai）
+    - cron: '0 19 * * *'
   workflow_dispatch: 
 permissions:
   contents: write
